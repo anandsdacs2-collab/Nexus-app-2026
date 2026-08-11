@@ -17,6 +17,7 @@ jobs:
       - name: Find and extract Android project
         run: |
           mkdir -p build-src
+
           ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
@@ -41,22 +42,24 @@ jobs:
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/gradle-build-action@v3
         with:
           gradle-version: "8.7"
 
-            - name: Fix JVM target
+      - name: Fix JVM target
         working-directory: build-src
         run: |
-          find . \( -name "build.gradle" -o -name "build.gradle.kts" \) -type f | while read f; do
+          find . -name "build.gradle" -o -name "build.gradle.kts" | while read f; do
+            echo "Fixing JVM target in $f"
+
             sed -i 's/JavaVersion.VERSION_1_8/JavaVersion.VERSION_17/g' "$f"
             sed -i 's/JavaVersion.VERSION_8/JavaVersion.VERSION_17/g' "$f"
-            sed -i 's/sourceCompatibility *= *1\.8/sourceCompatibility = 17/g' "$f"
-            sed -i 's/targetCompatibility *= *1\.8/targetCompatibility = 17/g' "$f"
-            sed -i 's/sourceCompatibility *= *JavaVersion.VERSION_1_8/sourceCompatibility = JavaVersion.VERSION_17/g' "$f"
-            sed -i 's/targetCompatibility *= *JavaVersion.VERSION_1_8/targetCompatibility = JavaVersion.VERSION_17/g' "$f"
-            sed -i 's/jvmTarget *= *"1\.8"/jvmTarget = "17"/g' "$f"
-            sed -i "s/jvmTarget *= *'1\.8'/jvmTarget = '17'/g" "$f"
+
+            sed -i 's/jvmTarget[[:space:]]*=[[:space:]]*"1.8"/jvmTarget = "17"/g' "$f"
+            sed -i "s/jvmTarget[[:space:]]*=[[:space:]]*'1.8'/jvmTarget = '17'/g" "$f"
+
+            sed -i 's/sourceCompatibility[[:space:]]*=[[:space:]]*JavaVersion.VERSION_1_8/sourceCompatibility = JavaVersion.VERSION_17/g' "$f"
+            sed -i 's/targetCompatibility[[:space:]]*=[[:space:]]*JavaVersion.VERSION_1_8/targetCompatibility = JavaVersion.VERSION_17/g' "$f"
           done
 
       - name: Create Gradle wrapper
