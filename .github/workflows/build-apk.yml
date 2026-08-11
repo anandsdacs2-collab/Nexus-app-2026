@@ -42,7 +42,7 @@ jobs:
         with:
           gradle-version: "8.7"
          
-          - name: Fix JVM target
+       - name: Fix JVM target
   working-directory: build-src
   run: |
     find . -name "build.gradle" -o -name "build.gradle.kts" | while read f; do
