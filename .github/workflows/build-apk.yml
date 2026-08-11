@@ -16,7 +16,7 @@ jobs:
 
       - name: Find and extract Android project
         run: |
-          mkdir build-src
+          mkdir -p build-src
           ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
@@ -26,7 +26,10 @@ jobs:
 
           echo "Using: $ZIP_FILE"
           unzip -q "$ZIP_FILE" -d build-src
-          cp gradle.properties build-src/gradle.properties
+
+          if [ -f "gradle.properties" ]; then
+            cp gradle.properties build-src/gradle.properties
+          fi
 
           echo "Project files:"
           find build-src -maxdepth 3 -type f | head -100
@@ -38,19 +41,18 @@ jobs:
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/gradle-build-action@v3
+        uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: "8.7"
-              
-        
-       - name: Fix JVM target
-  working-directory: build-src
-  run: |
-    find . -name "build.gradle" -o -name "build.gradle.kts" | while read f; do
-      sed -i 's/JavaVersion.VERSION_1_8/JavaVersion.VERSION_17/g' "$f"
-      sed -i 's/jvmTarget = "1.8"/jvmTarget = "17"/g' "$f"
-      sed -i "s/jvmTarget = '\''1.8'\''/jvmTarget = '\''17'\''/g" "$f"
-    done
+
+      - name: Fix JVM target
+        working-directory: build-src
+        run: |
+          find . \( -name "build.gradle" -o -name "build.gradle.kts" \) -type f | while read f; do
+            sed -i 's/JavaVersion.VERSION_1_8/JavaVersion.VERSION_17/g' "$f"
+            sed -i 's/jvmTarget = "1.8"/jvmTarget = "17"/g' "$f"
+            sed -i "s/jvmTarget = '\''1.8'\''/jvmTarget = '\''17'\''/g" "$f"
+          done
 
       - name: Create Gradle wrapper
         working-directory: build-src
