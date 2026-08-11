@@ -41,6 +41,14 @@ jobs:
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: "8.7"
+          - name: Fix JVM target
+  working-directory: build-src
+  run: |
+    find . -name "build.gradle" -o -name "build.gradle.kts" | while read f; do
+      sed -i 's/JavaVersion.VERSION_1_8/JavaVersion.VERSION_17/g' "$f"
+      sed -i 's/jvmTarget = "1.8"/jvmTarget = "17"/g' "$f"
+      sed -i "s/jvmTarget = '\''1.8'\''/jvmTarget = '\''17'\''/g" "$f"
+    done
 
       - name: Create Gradle wrapper
         working-directory: build-src
