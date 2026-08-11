@@ -26,6 +26,7 @@ jobs:
 
           echo "Using: $ZIP_FILE"
           unzip -q "$ZIP_FILE" -d build-src
+          cp gradle.properties build-src/gradle.properties
 
           echo "Project files:"
           find build-src -maxdepth 3 -type f | head -100
