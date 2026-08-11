@@ -15,10 +15,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Find and extract Android project
-        shell: bash
         run: |
-          set -e
-
           mkdir -p build-src
 
           ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
@@ -28,29 +25,14 @@ jobs:
             exit 1
           fi
 
-          echo "Using ZIP: $ZIP_FILE"
-
+          echo "Using: $ZIP_FILE"
           unzip -q "$ZIP_FILE" -d build-src
 
-          echo "Project files:"
-          find build-src -maxdepth 3 -type f | head -100
-
-      - name: Find Android project root
-        shell: bash
-        run: |
-          set -e
-
-          PROJECT_DIR=$(find build-src -name settings.gradle -o -name settings.gradle.kts | head -n 1)
-
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "settings.gradle not found"
-            exit 1
+          if [ -f "gradle.properties" ]; then
+            cp gradle.properties build-src/gradle.properties
           fi
 
-          PROJECT_DIR=$(dirname "$PROJECT_DIR")
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project: $PROJECT_DIR"
+          find build-src -maxdepth 3 -type f | head -100
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -63,32 +45,54 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      - name: Fix JVM target
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
+      - name: Force JVM target to Java 17
+        working-directory: build-src
         run: |
-          find . -name "*.gradle" -o -name "*.gradle.kts" | while read f; do
+          cat >> gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
+          kotlin.jvm.target.validation.mode=warning
+          EOF
+
+          find . -name "build.gradle" -o -name "build.gradle.kts" | while read f; do
+            echo "Processing $f"
+
+            sed -i 's/JavaVersion.VERSION_1_8/JavaVersion.VERSION_17/g' "$f"
+            sed -i 's/JavaVersion.VERSION_8/JavaVersion.VERSION_17/g' "$f"
+            sed -i 's/sourceCompatibility[[:space:]]*=[[:space:]]*1\.8/sourceCompatibility = 17/g' "$f"
+            sed -i 's/targetCompatibility[[:space:]]*=[[:space:]]*1\.8/targetCompatibility = 17/g' "$f"
+
             sed -i 's/jvmTarget[[:space:]]*=[[:space:]]*"1\.8"/jvmTarget = "17"/g' "$f"
-            sed -i "s/jvmTarget[[:space:]]*=[[:space:]]*'1\.8'/jvmTarget = '17'/g" "$f"
+            sed -i "s/jvmTarget[[:space:]]*=[[:space:]]*'1.8'/jvmTarget = '17'/g" "$f"
           done
 
+          cat > force-jvm.gradle <<'EOF'
+          allprojects {
+              tasks.withType(JavaCompile).configureEach {
+                  sourceCompatibility = "17"
+                  targetCompatibility = "17"
+              }
+
+              tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                  kotlinOptions {
+                      jvmTarget = "17"
+                  }
+              }
+          }
+          EOF
+
       - name: Create Gradle wrapper
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
+        working-directory: build-src
         run: |
           gradle wrapper --gradle-version 8.7
           chmod +x gradlew
 
       - name: Build APK
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
+        working-directory: build-src
         run: |
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace -I force-jvm.gradle
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NEXUS-APK
-          path: |
-            ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          path: build-src/app/build/outputs/apk/debug/app-debug.apk
